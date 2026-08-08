@@ -49,6 +49,7 @@ public struct TerminalContainerView: View {
                     )
                     .id(session.id)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
                 } else {
                     Spacer()
                 }

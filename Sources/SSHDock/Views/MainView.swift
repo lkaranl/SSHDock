@@ -15,21 +15,6 @@ public struct MainView: View {
         }
         .navigationTitle("SSHDock")
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    withAnimation {
-                        if columnVisibility == .all {
-                            columnVisibility = .detailOnly
-                        } else {
-                            columnVisibility = .all
-                        }
-                    }
-                } label: {
-                    Image(systemName: "sidebar.left")
-                }
-                .help("Alternar Barra Lateral")
-            }
-            
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     viewModel.hostToEdit = nil

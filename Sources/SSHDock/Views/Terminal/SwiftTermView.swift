@@ -29,6 +29,7 @@ public struct SwiftTermView: NSViewRepresentable {
     
     public func makeNSView(context: Context) -> LocalProcessTerminalView {
         let terminalView = LocalProcessTerminalView(frame: .zero)
+        terminalView.autoresizingMask = [.width, .height]
         terminalView.processDelegate = context.coordinator
         
         // Dispara o processo SSH no terminal PTY
