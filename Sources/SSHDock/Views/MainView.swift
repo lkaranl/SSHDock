@@ -13,7 +13,9 @@ public struct MainView: View {
             TerminalContainerView(viewModel: viewModel)
         }
         .navigationTitle("SSHDock")
-        .navigationSplitViewStyle(.balanced)
+        // .prominentDetail: sidebar sobrepõe o detail sem redimensioná-lo.
+        // Elimina 100% das chamadas setFrameSize/Metal durante toggle do sidebar.
+        .navigationSplitViewStyle(.prominentDetail)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {

@@ -4,55 +4,59 @@ import SwiftTerm
 
 // MARK: - ThrottledTerminalContainer
 //
-// Problema: NavigationSplitView chama setFrameSize 60–120x por segundo durante
-// a animação de abertura/fechamento do sidebar. O LocalProcessTerminalView usa um
-// renderizador Metal (MTKView) que recalcula o buffer de texto e re-renderiza a
-// cada chamada, bloqueando a thread principal e causando o "delay" visível.
+// Container NSView que debounce mudanças de tamanho do terminal Metal.
+// Com `.prominentDetail` no NavigationSplitView, o sidebar NÃO redimensiona
+// o detail — então este container serve como proteção para resizes manuais
+// de janela (arrastar borda) e edge cases.
 //
-// Solução: Este container NSView intercepta setFrameSize e usa um debounce de
-// 60ms, propagando o novo tamanho ao Metal apenas UMA vez após a animação
-// estabilizar. Durante a transição, o container faz clip do conteúdo existente
-// com uma cor de fundo correspondente para aparência limpa.
+// Usa DispatchWorkItem em vez de Timer — zero overhead de RunLoop.
 
 public final class ThrottledTerminalContainer: NSView {
     private(set) var terminalView: LocalProcessTerminalView?
-    private var resizeTimer: Timer?
-    private var targetSize: NSSize = .zero
+    private var pendingResize: DispatchWorkItem?
+    private var hasInitialLayout = false
 
     override public var isFlipped: Bool { true }
 
     public func attach(_ terminal: LocalProcessTerminalView) {
         wantsLayer = true
-        // Background que combina com o terminal para evitar flash durante resize
         layer?.backgroundColor = NSColor.black.cgColor
-        layer?.masksToBounds = true
 
         self.terminalView = terminal
         terminal.autoresizingMask = []
         addSubview(terminal)
-        terminal.frame = bounds
     }
 
-    override public func setFrameSize(_ newSize: NSSize) {
-        super.setFrameSize(newSize)
-        guard newSize != .zero, newSize != terminalView?.frame.size else { return }
+    override public func layout() {
+        super.layout()
+        guard let terminal = terminalView else { return }
+        let newSize = bounds.size
+        guard newSize.width > 0, newSize.height > 0 else { return }
 
-        targetSize = newSize
+        if !hasInitialLayout {
+            // Primeiro layout: aplica imediatamente sem debounce
+            hasInitialLayout = true
+            terminal.frame = bounds
+            return
+        }
 
-        // Cancela o timer anterior e agenda um novo debounce
-        resizeTimer?.invalidate()
-        resizeTimer = Timer.scheduledTimer(withTimeInterval: 0.06, repeats: false) { [weak self] _ in
-            guard let self else { return }
-            // Desativa animações CA para snap instantâneo sem flash
+        // Resizes subsequentes: debounce 50ms para window drag resize
+        guard terminal.frame.size != newSize else { return }
+
+        pendingResize?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, let tv = self.terminalView else { return }
             CATransaction.begin()
             CATransaction.setDisableActions(true)
-            self.terminalView?.frame = CGRect(origin: .zero, size: self.targetSize)
+            tv.frame = self.bounds
             CATransaction.commit()
         }
+        pendingResize = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: work)
     }
 
     deinit {
-        resizeTimer?.invalidate()
+        pendingResize?.cancel()
     }
 }
 
@@ -91,16 +95,8 @@ public struct SwiftTermView: NSViewRepresentable {
         terminalView.processDelegate = context.coordinator
         container.attach(terminalView)
 
-        // Adia startProcess para o próximo ciclo do run loop,
-        // garantindo que o container já foi layoutado com frame correto
-        // antes de o Metal calcular as dimensões iniciais do PTY.
+        // startProcess é adiado 1 ciclo para container ter frame válido
         DispatchQueue.main.async {
-            // Sincroniza o frame do terminal com o container antes de iniciar
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            terminalView.frame = container.bounds
-            CATransaction.commit()
-
             terminalView.startProcess(
                 executable: executable,
                 args: args,
