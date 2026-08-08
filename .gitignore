@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Swift Package Manager & Xcode
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+*.xcodeproj
+*.xcworkspace
+*.xcuserdata
+DerivedData/
+
+# Output local e logs
+graphify-out/
+*.log
