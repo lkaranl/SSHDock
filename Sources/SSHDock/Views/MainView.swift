@@ -2,18 +2,18 @@ import SwiftUI
 
 public struct MainView: View {
     @StateObject private var viewModel = AppViewModel()
-    @State private var columnVisibility = NavigationSplitViewVisibility.all
     
     public init() {}
     
     public var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
+        NavigationSplitView {
             SidebarView(viewModel: viewModel)
                 .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
         } detail: {
             TerminalContainerView(viewModel: viewModel)
         }
         .navigationTitle("SSHDock")
+        .navigationSplitViewStyle(.balanced)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
