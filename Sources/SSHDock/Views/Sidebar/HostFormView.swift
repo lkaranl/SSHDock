@@ -15,6 +15,7 @@ public struct HostFormView: View {
     @State private var secretCredential: String = "" // Senha ou Passphrase da Chave
     @State private var selectedGroupId: UUID? = nil
     @State private var isPresentingDeleteAlert: Bool = false
+    @State private var keyMessage: String? = nil
     
     public init(viewModel: AppViewModel, hostToEdit: Host? = nil) {
         self.viewModel = viewModel
@@ -187,6 +188,42 @@ public struct HostFormView: View {
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                         }
+                    }
+                    
+                    // Ações de Criar e Exportar Chave SSH
+                    HStack(spacing: 8) {
+                        Button {
+                            generateNewKey()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "key.badge.plus")
+                                Text("Gerar Nova Chave")
+                            }
+                            .font(.system(size: 11, weight: .medium))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        
+                        Button {
+                            exportPublicKey()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "square.and.arrow.up")
+                                Text("Exportar .pub para Host")
+                            }
+                            .font(.system(size: 11, weight: .medium))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(hostname.trimmingCharacters(in: .whitespaces).isEmpty || username.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    .padding(.leading, 124)
+                    
+                    if let keyMsg = keyMessage {
+                        Text(keyMsg)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(keyMsg.contains("✓") ? .green : .red)
+                            .padding(.leading, 124)
                     }
                     
                     Divider().opacity(0.5)
@@ -387,6 +424,52 @@ public struct HostFormView: View {
                 sshKeyPath = "~" + path.dropFirst(home.count)
             } else {
                 sshKeyPath = path
+            }
+        }
+    }
+    
+    private func generateNewKey() {
+        do {
+            let keyFilename = "id_ed25519_sshdock_\(Int(Date().timeIntervalSince1970))"
+            let (privPath, _) = try SSHKeyManagerService.shared.generateKeyPair(
+                filename: keyFilename,
+                type: "ed25519",
+                passphrase: secretCredential
+            )
+            sshKeyPath = privPath
+            keyMessage = "✓ Nova chave '\(keyFilename)' gerada com sucesso em ~/.ssh!"
+        } catch {
+            keyMessage = "❌ Erro: \(error.localizedDescription)"
+        }
+    }
+    
+    private func exportPublicKey() {
+        let cleanHost = hostname.trimmingCharacters(in: .whitespaces)
+        let cleanUser = username.trimmingCharacters(in: .whitespaces)
+        guard !cleanHost.isEmpty && !cleanUser.isEmpty else { return }
+        
+        let pubPath = sshKeyPath.hasSuffix(".pub") ? sshKeyPath : "\(sshKeyPath).pub"
+        let portInt = Int(portString) ?? 22
+        let secret = secretCredential.isEmpty ? nil : secretCredential
+        
+        keyMessage = "⏳ Exportando chave pública para \(cleanUser)@\(cleanHost)..."
+        
+        Task {
+            do {
+                try await SSHKeyManagerService.shared.exportPublicKeyToRemoteHost(
+                    publicKeyPath: pubPath,
+                    hostname: cleanHost,
+                    port: portInt,
+                    username: cleanUser,
+                    password: secret
+                )
+                await MainActor.run {
+                    keyMessage = "✓ Chave pública exportada para \(cleanUser)@\(cleanHost) em authorized_keys!"
+                }
+            } catch {
+                await MainActor.run {
+                    keyMessage = "❌ Erro ao exportar: \(error.localizedDescription)"
+                }
             }
         }
     }

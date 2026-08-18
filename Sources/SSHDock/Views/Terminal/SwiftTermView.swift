@@ -95,12 +95,23 @@ public struct SwiftTermView: NSViewRepresentable {
         terminalView.processDelegate = context.coordinator
         container.attach(terminalView)
 
+        let font = TerminalFontManager.shared.getBestTerminalFont(size: 13.0)
+        terminalView.font = font
+
+        var envDict = ProcessInfo.processInfo.environment
+        envDict["TERM"] = "xterm-256color"
+        envDict["COLORTERM"] = "truecolor"
+        envDict["LANG"] = "en_US.UTF-8"
+        envDict["LC_ALL"] = "en_US.UTF-8"
+        envDict["LC_CTYPE"] = "en_US.UTF-8"
+        let env = envDict.map { "\($0.key)=\($0.value)" }
+
         // startProcess é adiado 1 ciclo para container ter frame válido
         DispatchQueue.main.async {
             terminalView.startProcess(
                 executable: executable,
                 args: args,
-                environment: nil,
+                environment: env,
                 execName: nil
             )
             onStateChanged(.connected)

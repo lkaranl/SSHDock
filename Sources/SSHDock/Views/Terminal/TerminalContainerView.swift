@@ -30,53 +30,19 @@ public struct TerminalContainerView: View {
 
                 Divider()
 
-                // View de Terminal Ativo
-                terminalView
+                // View de Terminais com Pool Persistente (0ms Tab Switch)
+                TerminalMultiSessionView(
+                    sessions: viewModel.activeSessions,
+                    selectedSessionId: viewModel.selectedSessionId,
+                    commandToInject: pendingCommand,
+                    onStateChanged: { id, newState in
+                        viewModel.updateSessionState(id: id, state: newState)
+                    }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .background(Color(NSColor.textBackgroundColor))
-    }
-
-    // Extraído como computed property para evitar re-computação pesada no body principal
-    @ViewBuilder
-    private var terminalView: some View {
-        if let selectedId = viewModel.selectedSessionId,
-           let session = viewModel.activeSessions.first(where: { $0.id == selectedId }) {
-
-            // Constrói args SSH inline — zero alocação de objetos temporários
-            let host = session.host
-            let sshArgs = buildSSHArgs(for: host)
-
-            SwiftTermView(
-                host: host,
-                executable: "/usr/bin/ssh",
-                args: sshArgs,
-                commandToInject: pendingCommand,
-                onStateChanged: { newState in
-                    viewModel.updateSessionState(id: session.id, state: newState)
-                }
-            )
-            .id(session.id)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            Spacer()
-        }
-    }
-
-    /// Constrói argumentos SSH sem instanciar TerminalViewModel
-    private func buildSSHArgs(for host: Host) -> [String] {
-        var args: [String] = []
-        args.reserveCapacity(8)
-        args.append("-p")
-        args.append("\(host.port)")
-        args.append("-o")
-        args.append("StrictHostKeyChecking=accept-new")
-        if case .sshKey(let keyPath) = host.authMethod, !keyPath.isEmpty {
-            args.append("-i")
-            args.append(NSString(string: keyPath).expandingTildeInPath)
-        }
-        args.append("\(host.username)@\(host.hostname)")
-        return args
     }
     
     private var emptyStateView: some View {
