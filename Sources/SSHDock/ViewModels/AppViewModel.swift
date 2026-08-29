@@ -1,3 +1,7 @@
+import Foundation
+import Combine
+import SwiftUI
+
 public extension Notification.Name {
     static let openShortcutsManager = Notification.Name("SSHDockOpenShortcutsManager")
 }
