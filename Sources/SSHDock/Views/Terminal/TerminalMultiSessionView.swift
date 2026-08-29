@@ -8,8 +8,70 @@ import SwiftTerm
 public final class TerminalMultiSessionContainerView: NSView {
     private var terminalViews: [UUID: LocalProcessTerminalView] = [:]
     private var currentSelectedId: UUID?
+    private var fontObserver: NSObjectProtocol?
     
     override public var isFlipped: Bool { true }
+    
+    override public init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupFontObserver()
+    }
+    
+    required public init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupFontObserver()
+    }
+    
+    deinit {
+        if let observer = fontObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+    
+    private func setupFontObserver() {
+        fontObserver = NotificationCenter.default.addObserver(
+            forName: .terminalFontSizeChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.updateAllTerminalFonts()
+        }
+    }
+    
+    private func updateAllTerminalFonts() {
+        let font = TerminalFontManager.shared.getBestTerminalFont()
+        for (_, tv) in terminalViews {
+            tv.font = font
+        }
+    }
+    
+    override public func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard event.modifierFlags.contains(.command) else {
+            return super.performKeyEquivalent(with: event)
+        }
+        
+        let chars = event.charactersIgnoringModifiers ?? ""
+        if chars == "+" || chars == "=" {
+            TerminalFontManager.shared.increaseFontSize()
+            return true
+        } else if chars == "-" {
+            TerminalFontManager.shared.decreaseFontSize()
+            return true
+        } else if chars == "0" {
+            TerminalFontManager.shared.resetFontSize()
+            return true
+        }
+        
+        return super.performKeyEquivalent(with: event)
+    }
+    
+    override public func magnify(with event: NSEvent) {
+        if event.magnification > 0.05 {
+            TerminalFontManager.shared.increaseFontSize()
+        } else if event.magnification < -0.05 {
+            TerminalFontManager.shared.decreaseFontSize()
+        }
+    }
     
     public func syncSessions(
         sessions: [SSHSession],
@@ -32,8 +94,8 @@ public final class TerminalMultiSessionContainerView: NSView {
                 let tv = LocalProcessTerminalView(frame: bounds)
                 tv.autoresizingMask = [.width, .height]
                 
-                // Configura fonte Nerd Font para suporte a lsd / eza / ícones
-                let font = TerminalFontManager.shared.getBestTerminalFont(size: 13.0)
+                // Configura fonte Nerd Font com tamanho atual do TerminalFontManager
+                let font = TerminalFontManager.shared.getBestTerminalFont()
                 tv.font = font
                 
                 // Configura o delegate da sessão com o ID correspondente

@@ -15,8 +15,59 @@ public final class ThrottledTerminalContainer: NSView {
     private(set) var terminalView: LocalProcessTerminalView?
     private var pendingResize: DispatchWorkItem?
     private var hasInitialLayout = false
+    private var fontObserver: NSObjectProtocol?
 
     override public var isFlipped: Bool { true }
+
+    override public init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupFontObserver()
+    }
+
+    required public init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupFontObserver()
+    }
+
+    private func setupFontObserver() {
+        fontObserver = NotificationCenter.default.addObserver(
+            forName: .terminalFontSizeChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            if let tv = self?.terminalView {
+                tv.font = TerminalFontManager.shared.getBestTerminalFont()
+            }
+        }
+    }
+
+    override public func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard event.modifierFlags.contains(.command) else {
+            return super.performKeyEquivalent(with: event)
+        }
+        
+        let chars = event.charactersIgnoringModifiers ?? ""
+        if chars == "+" || chars == "=" {
+            TerminalFontManager.shared.increaseFontSize()
+            return true
+        } else if chars == "-" {
+            TerminalFontManager.shared.decreaseFontSize()
+            return true
+        } else if chars == "0" {
+            TerminalFontManager.shared.resetFontSize()
+            return true
+        }
+        
+        return super.performKeyEquivalent(with: event)
+    }
+
+    override public func magnify(with event: NSEvent) {
+        if event.magnification > 0.05 {
+            TerminalFontManager.shared.increaseFontSize()
+        } else if event.magnification < -0.05 {
+            TerminalFontManager.shared.decreaseFontSize()
+        }
+    }
 
     public func attach(_ terminal: LocalProcessTerminalView) {
         wantsLayer = true
@@ -57,6 +108,9 @@ public final class ThrottledTerminalContainer: NSView {
 
     deinit {
         pendingResize?.cancel()
+        if let observer = fontObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 }
 
@@ -95,7 +149,7 @@ public struct SwiftTermView: NSViewRepresentable {
         terminalView.processDelegate = context.coordinator
         container.attach(terminalView)
 
-        let font = TerminalFontManager.shared.getBestTerminalFont(size: 13.0)
+        let font = TerminalFontManager.shared.getBestTerminalFont()
         terminalView.font = font
 
         let secret = KeychainManager.shared.readCredential(for: host.keychainAccountKey)

@@ -20,5 +20,28 @@ struct SSHDockApp: App {
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
+        .commands {
+            CommandGroup(after: .toolbar) {
+                Button("Aumentar Fonte") {
+                    TerminalFontManager.shared.increaseFontSize()
+                }
+                .keyboardShortcut("+", modifiers: .command)
+                
+                Button("Aumentar Fonte (Alternativo)") {
+                    TerminalFontManager.shared.increaseFontSize()
+                }
+                .keyboardShortcut("=", modifiers: .command)
+                
+                Button("Diminuir Fonte") {
+                    TerminalFontManager.shared.decreaseFontSize()
+                }
+                .keyboardShortcut("-", modifiers: .command)
+                
+                Button("Tamanho Padrão da Fonte") {
+                    TerminalFontManager.shared.resetFontSize()
+                }
+                .keyboardShortcut("0", modifiers: .command)
+            }
+        }
     }
 }
