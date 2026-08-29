@@ -167,7 +167,7 @@ public final class TerminalMultiSessionContainerView: NSView {
     
     private func buildSSHArgs(for host: Host) -> [String] {
         var args: [String] = []
-        args.reserveCapacity(8)
+        args.reserveCapacity(10)
         args.append("-p")
         args.append("\(host.port)")
         args.append("-o")
@@ -176,7 +176,9 @@ public final class TerminalMultiSessionContainerView: NSView {
             args.append("-i")
             args.append(NSString(string: keyPath).expandingTildeInPath)
         }
+        args.append("-t")
         args.append("\(host.username)@\(host.hostname)")
+        args.append("fastfetch 2>/dev/null || true; exec ${SHELL:-/bin/sh} -l")
         return args
     }
 }

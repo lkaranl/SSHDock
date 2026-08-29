@@ -28,8 +28,10 @@ public class TerminalViewModel: ObservableObject {
             args.append(contentsOf: ["-i", expandedPath])
         }
         
-        // Destination user@host
+        // Força alocação de PTY e executa fastfetch na inicialização do shell
+        args.append("-t")
         args.append("\(host.username)@\(host.hostname)")
+        args.append("fastfetch 2>/dev/null || true; exec ${SHELL:-/bin/sh} -l")
         
         return ("/usr/bin/ssh", args)
     }
