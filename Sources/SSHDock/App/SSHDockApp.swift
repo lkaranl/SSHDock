@@ -21,6 +21,18 @@ struct SSHDockApp: App {
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
         .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("Nova Aba no Servidor Atual") {
+                    NotificationCenter.default.post(name: .openNewTab, object: nil)
+                }
+                .keyboardShortcut("t", modifiers: .command)
+                
+                Button("Fechar Aba Atual") {
+                    NotificationCenter.default.post(name: .closeCurrentTab, object: nil)
+                }
+                .keyboardShortcut("w", modifiers: .command)
+            }
+            
             CommandGroup(after: .toolbar) {
                 Button("Aumentar Fonte") {
                     TerminalFontManager.shared.increaseFontSize()

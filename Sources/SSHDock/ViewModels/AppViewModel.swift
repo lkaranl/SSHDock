@@ -4,6 +4,8 @@ import SwiftUI
 
 public extension Notification.Name {
     static let openShortcutsManager = Notification.Name("SSHDockOpenShortcutsManager")
+    static let openNewTab = Notification.Name("SSHDockOpenNewTab")
+    static let closeCurrentTab = Notification.Name("SSHDockCloseCurrentTab")
 }
 
 public class AppViewModel: ObservableObject {
@@ -38,6 +40,22 @@ public class AppViewModel: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             self?.isPresentingShortcutsSheet = true
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: .openNewTab,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.openNewSessionForCurrentHost()
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: .closeCurrentTab,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.closeCurrentSession()
         }
     }
     
@@ -149,21 +167,78 @@ public class AppViewModel: ObservableObject {
     }
     
     // MARK: - Controle de Sessões SSH / Abas
-    public func openSession(for host: Host) {
-        // Se a sessão já estiver aberta, apenas seleciona
-        if let existing = activeSessions.first(where: { $0.host.id == host.id }) {
-            selectedSessionId = existing.id
+    
+    /// Retorna as sessões ativas agrupadas por Host mantendo a ordem de abertura
+    public var groupedActiveSessions: [(host: Host, sessions: [SSHSession])] {
+        var result: [(host: Host, sessions: [SSHSession])] = []
+        var hostOrder: [UUID] = []
+        var dict: [UUID: (Host, [SSHSession])] = [:]
+        
+        for session in activeSessions {
+            let hostId = session.host.id
+            if dict[hostId] == nil {
+                dict[hostId] = (session.host, [session])
+                hostOrder.append(hostId)
+            } else {
+                dict[hostId]?.1.append(session)
+            }
+        }
+        
+        for id in hostOrder {
+            if let entry = dict[id] {
+                result.append(entry)
+            }
+        }
+        
+        return result
+    }
+    
+    public func openSession(for host: Host, forceNew: Bool = false) {
+        let existingSessions = activeSessions.filter { $0.host.id == host.id }
+        
+        if !forceNew && !existingSessions.isEmpty {
+            // Se não for forçada nova aba e já houver sessões deste host, seleciona a ativa ou a última
+            if let currentSelected = selectedSessionId, existingSessions.contains(where: { $0.id == currentSelected }) {
+                return
+            }
+            selectedSessionId = existingSessions.last?.id
             return
         }
         
-        let newSession = SSHSession(host: host, state: .connecting)
+        let sessionIndex = existingSessions.count + 1
+        let title = existingSessions.isEmpty ? host.name : "\(host.name) #\(sessionIndex)"
+        
+        let newSession = SSHSession(host: host, title: title, state: .connecting)
         activeSessions.append(newSession)
         selectedSessionId = newSession.id
+    }
+    
+    public func openNewSessionForCurrentHost() {
+        guard let currentId = selectedSessionId,
+              let currentSession = activeSessions.first(where: { $0.id == currentId }) else {
+            if let firstHost = hosts.first {
+                openSession(for: firstHost, forceNew: true)
+            }
+            return
+        }
+        openSession(for: currentSession.host, forceNew: true)
+    }
+    
+    public func closeCurrentSession() {
+        guard let currentId = selectedSessionId else { return }
+        closeSession(id: currentId)
     }
     
     public func closeSession(id: UUID) {
         activeSessions.removeAll { $0.id == id }
         if selectedSessionId == id {
+            selectedSessionId = activeSessions.last?.id
+        }
+    }
+    
+    public func closeAllSessionsForHost(hostId: UUID) {
+        activeSessions.removeAll { $0.host.id == hostId }
+        if let currentId = selectedSessionId, !activeSessions.contains(where: { $0.id == currentId }) {
             selectedSessionId = activeSessions.last?.id
         }
     }

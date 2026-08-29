@@ -82,11 +82,16 @@ public struct SidebarView: View {
                                 .padding(.leading, 12)
                         } else {
                             ForEach(groupHosts) { host in
+                                let hostSessions = viewModel.activeSessions.filter { $0.host.id == host.id }
                                 HostRowView(
                                     host: host,
-                                    activeSession: viewModel.activeSessions.first(where: { $0.host.id == host.id }),
+                                    activeSession: hostSessions.first,
+                                    activeSessionsCount: hostSessions.count,
                                     onConnect: {
                                         viewModel.openSession(for: host)
+                                    },
+                                    onNewTab: {
+                                        viewModel.openSession(for: host, forceNew: true)
                                     },
                                     onEdit: {
                                         viewModel.hostToEdit = host
@@ -111,11 +116,16 @@ public struct SidebarView: View {
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.secondary)) {
                         ForEach(unassigned) { host in
+                            let hostSessions = viewModel.activeSessions.filter { $0.host.id == host.id }
                             HostRowView(
                                 host: host,
-                                activeSession: viewModel.activeSessions.first(where: { $0.host.id == host.id }),
+                                activeSession: hostSessions.first,
+                                activeSessionsCount: hostSessions.count,
                                 onConnect: {
                                     viewModel.openSession(for: host)
+                                },
+                                onNewTab: {
+                                    viewModel.openSession(for: host, forceNew: true)
                                 },
                                 onEdit: {
                                     viewModel.hostToEdit = host

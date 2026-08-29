@@ -9,46 +9,192 @@ public struct TerminalTabBarView: View {
     
     public var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 2) {
-                ForEach(viewModel.activeSessions) { session in
-                    let isSelected = viewModel.selectedSessionId == session.id
+            HStack(spacing: 8) {
+                ForEach(viewModel.groupedActiveSessions, id: \.host.id) { group in
+                    let host = group.host
+                    let sessions = group.sessions
                     
-                    HStack(spacing: 6) {
-                        Image(systemName: session.state.iconName)
-                            .font(.system(size: 10))
-                            .foregroundColor(statusColor(for: session.state))
-                        
-                        Text(session.title)
-                            .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                            .foregroundColor(isSelected ? .primary : .secondary)
-                            .lineLimit(1)
-                        
-                        Button {
-                            viewModel.closeSession(id: session.id)
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(.secondary)
-                                .padding(2)
-                                .background(Color.secondary.opacity(0.1))
-                                .clipShape(Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .help("Fechar Sessão")
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(isSelected ? Color(NSColor.windowBackgroundColor) : Color.primary.opacity(0.04))
-                    .cornerRadius(6, corners: [.topLeft, .topRight])
-                    .onTapGesture {
-                        viewModel.selectedSessionId = session.id
+                    if sessions.count == 1, let session = sessions.first {
+                        // Aba Individual Simples
+                        singleTab(host: host, session: session)
+                    } else {
+                        // Grupo de Abas Múltiplas do mesmo Host
+                        groupedTabs(host: host, sessions: sessions)
                     }
                 }
             }
-            .padding(.leading, 8)
+            .padding(.horizontal, 8)
             .padding(.top, 4)
+            .padding(.bottom, 2)
         }
         .background(Material.bar)
+    }
+    
+    // MARK: - Aba Única
+    private func singleTab(host: Host, session: SSHSession) -> some View {
+        let isSelected = viewModel.selectedSessionId == session.id
+        
+        return HStack(spacing: 6) {
+            Image(systemName: session.state.iconName)
+                .font(.system(size: 10))
+                .foregroundColor(statusColor(for: session.state))
+            
+            Text(host.name)
+                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                .foregroundColor(isSelected ? .primary : .secondary)
+                .lineLimit(1)
+            
+            // Botão Adicionar outra aba neste Host
+            Button {
+                viewModel.openSession(for: host, forceNew: true)
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(.secondary)
+                    .padding(2)
+                    .background(Color.secondary.opacity(0.1))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .help("Nova aba em \(host.name) (⌘ T)")
+            
+            // Botão Fechar Sessão
+            Button {
+                viewModel.closeSession(id: session.id)
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(.secondary)
+                    .padding(2)
+                    .background(Color.secondary.opacity(0.1))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .help("Fechar Sessão (⌘ W)")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(isSelected ? Color(NSColor.windowBackgroundColor) : Color.primary.opacity(0.04))
+        .cornerRadius(6, corners: [.topLeft, .topRight])
+        .overlay(
+            RoundedCornerShape(radius: 6, corners: [.topLeft, .topRight])
+                .stroke(isSelected ? Color.primary.opacity(0.1) : Color.clear, lineWidth: 1)
+        )
+        .onTapGesture {
+            viewModel.selectedSessionId = session.id
+        }
+        .contextMenu {
+            Button {
+                viewModel.openSession(for: host, forceNew: true)
+            } label: {
+                Label("Nova Aba em \(host.name)", systemImage: "plus")
+            }
+            Divider()
+            Button(role: .destructive) {
+                viewModel.closeSession(id: session.id)
+            } label: {
+                Label("Fechar Aba", systemImage: "xmark")
+            }
+        }
+    }
+    
+    // MARK: - Grupo de Abas do Host
+    private func groupedTabs(host: Host, sessions: [SSHSession]) -> some View {
+        let isAnySelected = sessions.contains(where: { $0.id == viewModel.selectedSessionId })
+        
+        return HStack(spacing: 4) {
+            // Cabeçalho do Grupo do Servidor
+            HStack(spacing: 4) {
+                Image(systemName: "server.rack")
+                    .font(.system(size: 9))
+                    .foregroundColor(.accentColor)
+                
+                Text(host.name)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                
+                Button {
+                    viewModel.openSession(for: host, forceNew: true)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.accentColor)
+                        .padding(2)
+                        .background(Color.accentColor.opacity(0.12))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Nova aba em \(host.name) (⌘ T)")
+            }
+            .padding(.leading, 6)
+            .padding(.trailing, 2)
+            
+            // Sub-abas numeradas (#1, #2, #3...)
+            ForEach(Array(sessions.enumerated()), id: \.element.id) { index, session in
+                let isSelected = viewModel.selectedSessionId == session.id
+                
+                HStack(spacing: 4) {
+                    Image(systemName: session.state.iconName)
+                        .font(.system(size: 8))
+                        .foregroundColor(statusColor(for: session.state))
+                    
+                    Text("#\(index + 1)")
+                        .font(.system(size: 11, weight: isSelected ? .bold : .medium))
+                        .foregroundColor(isSelected ? .primary : .secondary)
+                    
+                    Button {
+                        viewModel.closeSession(id: session.id)
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundColor(.secondary)
+                            .padding(2)
+                            .background(Color.secondary.opacity(0.15))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Fechar Aba #\(index + 1)")
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(isSelected ? Color(NSColor.windowBackgroundColor) : Color.primary.opacity(0.06))
+                .cornerRadius(4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(isSelected ? Color.accentColor.opacity(0.4) : Color.clear, lineWidth: 1)
+                )
+                .onTapGesture {
+                    viewModel.selectedSessionId = session.id
+                }
+                .contextMenu {
+                    Button {
+                        viewModel.openSession(for: host, forceNew: true)
+                    } label: {
+                        Label("Nova Aba neste Servidor", systemImage: "plus")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        viewModel.closeSession(id: session.id)
+                    } label: {
+                        Label("Fechar Aba #\(index + 1)", systemImage: "xmark")
+                    }
+                    Button(role: .destructive) {
+                        viewModel.closeAllSessionsForHost(hostId: host.id)
+                    } label: {
+                        Label("Fechar Todas as Abas de \(host.name)", systemImage: "xmark.circle")
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 4)
+        .background(isAnySelected ? Color.primary.opacity(0.06) : Color.primary.opacity(0.02))
+        .cornerRadius(6, corners: [.topLeft, .topRight])
+        .overlay(
+            RoundedCornerShape(radius: 6, corners: [.topLeft, .topRight])
+                .stroke(isAnySelected ? Color.primary.opacity(0.15) : Color.primary.opacity(0.08), lineWidth: 1)
+        )
     }
     
     private func statusColor(for state: ConnectionState) -> Color {

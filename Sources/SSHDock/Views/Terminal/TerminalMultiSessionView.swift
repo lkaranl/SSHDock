@@ -46,7 +46,7 @@ public final class TerminalMultiSessionContainerView: NSView {
     }
     
     override public func performKeyEquivalent(with event: NSEvent) -> Bool {
-        // 1. Atalhos de Zoom de fonte
+        // 1. Atalhos de Sistema (Zoom e Gestão de Abas)
         if event.modifierFlags.contains(.command) {
             let chars = event.charactersIgnoringModifiers ?? ""
             if chars == "+" || chars == "=" {
@@ -57,6 +57,12 @@ public final class TerminalMultiSessionContainerView: NSView {
                 return true
             } else if chars == "0" {
                 TerminalFontManager.shared.resetFontSize()
+                return true
+            } else if chars.lowercased() == "t" {
+                NotificationCenter.default.post(name: .openNewTab, object: nil)
+                return true
+            } else if chars.lowercased() == "w" {
+                NotificationCenter.default.post(name: .closeCurrentTab, object: nil)
                 return true
             }
         }
@@ -178,7 +184,7 @@ public final class TerminalMultiSessionContainerView: NSView {
         }
         args.append("-t")
         args.append("\(host.username)@\(host.hostname)")
-        args.append("fastfetch 2>/dev/null || true; exec ${SHELL:-/bin/sh} -l")
+        args.append("command -v fish >/dev/null 2>&1 && exec fish -C \"fastfetch 2>/dev/null || true\" -l || { fastfetch 2>/dev/null || true; exec ${SHELL:-/bin/sh} -l; }")
         return args
     }
 }

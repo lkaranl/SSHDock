@@ -42,7 +42,7 @@ public final class ThrottledTerminalContainer: NSView {
     }
 
     override public func performKeyEquivalent(with event: NSEvent) -> Bool {
-        // 1. Atalhos de Zoom de fonte
+        // 1. Atalhos de Sistema (Zoom e Gestão de Abas)
         if event.modifierFlags.contains(.command) {
             let chars = event.charactersIgnoringModifiers ?? ""
             if chars == "+" || chars == "=" {
@@ -53,6 +53,12 @@ public final class ThrottledTerminalContainer: NSView {
                 return true
             } else if chars == "0" {
                 TerminalFontManager.shared.resetFontSize()
+                return true
+            } else if chars.lowercased() == "t" {
+                NotificationCenter.default.post(name: .openNewTab, object: nil)
+                return true
+            } else if chars.lowercased() == "w" {
+                NotificationCenter.default.post(name: .closeCurrentTab, object: nil)
                 return true
             }
         }

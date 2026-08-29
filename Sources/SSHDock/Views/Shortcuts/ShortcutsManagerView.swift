@@ -191,6 +191,11 @@ public struct ShortcutsManagerView: View {
     // MARK: - Lista de Atalhos do Sistema
     private var systemShortcutsListView: some View {
         List {
+            Section(header: Text("Abas & Sessões").font(.caption).fontWeight(.bold)) {
+                SystemShortcutRow(title: "Nova Aba no Servidor Ativo", shortcut: "⌘ T", description: "Abre uma nova sessão/terminal simultâneo no host selecionado.")
+                SystemShortcutRow(title: "Fechar Aba Atual", shortcut: "⌘ W", description: "Encerra a sessão e fecha a aba do terminal ativo.")
+            }
+            
             Section(header: Text("Visualização & Zoom").font(.caption).fontWeight(.bold)) {
                 SystemShortcutRow(title: "Aumentar Fonte do Terminal", shortcut: "⌘ + / ⌘ =", description: "Aumenta em 1pt o tamanho dos caracteres do terminal.")
                 SystemShortcutRow(title: "Diminuir Fonte do Terminal", shortcut: "⌘ -", description: "Diminui em 1pt o tamanho dos caracteres do terminal.")

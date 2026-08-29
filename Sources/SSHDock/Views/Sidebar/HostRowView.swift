@@ -3,7 +3,9 @@ import SwiftUI
 public struct HostRowView: View {
     public let host: Host
     public let activeSession: SSHSession?
+    public let activeSessionsCount: Int
     public let onConnect: () -> Void
+    public let onNewTab: () -> Void
     public let onEdit: () -> Void
     public let onDelete: () -> Void
     
@@ -12,13 +14,17 @@ public struct HostRowView: View {
     public init(
         host: Host,
         activeSession: SSHSession? = nil,
+        activeSessionsCount: Int = 0,
         onConnect: @escaping () -> Void,
+        onNewTab: @escaping () -> Void = {},
         onEdit: @escaping () -> Void,
         onDelete: @escaping () -> Void
     ) {
         self.host = host
         self.activeSession = activeSession
+        self.activeSessionsCount = activeSessionsCount
         self.onConnect = onConnect
+        self.onNewTab = onNewTab
         self.onEdit = onEdit
         self.onDelete = onDelete
     }
@@ -44,7 +50,15 @@ public struct HostRowView: View {
             
             Spacer()
             
-            if let session = activeSession {
+            if activeSessionsCount > 1 {
+                Text("\(activeSessionsCount) abas")
+                    .font(.system(size: 10, weight: .bold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.accentColor.opacity(0.15))
+                    .foregroundColor(.accentColor)
+                    .cornerRadius(8)
+            } else if let session = activeSession {
                 StatusBadge(state: session.state)
             } else if isHovered {
                 HStack(spacing: 6) {
@@ -86,6 +100,9 @@ public struct HostRowView: View {
         .contextMenu {
             Button(action: onConnect) {
                 Label("Conectar Sessão", systemImage: "terminal")
+            }
+            Button(action: onNewTab) {
+                Label("Abrir Nova Aba (⌘ T)", systemImage: "plus.rectangle.on.rectangle")
             }
             Divider()
             Button(action: onEdit) {
