@@ -98,13 +98,8 @@ public struct SwiftTermView: NSViewRepresentable {
         let font = TerminalFontManager.shared.getBestTerminalFont(size: 13.0)
         terminalView.font = font
 
-        var envDict = ProcessInfo.processInfo.environment
-        envDict["TERM"] = "xterm-256color"
-        envDict["COLORTERM"] = "truecolor"
-        envDict["LANG"] = "en_US.UTF-8"
-        envDict["LC_ALL"] = "en_US.UTF-8"
-        envDict["LC_CTYPE"] = "en_US.UTF-8"
-        let env = envDict.map { "\($0.key)=\($0.value)" }
+        let secret = KeychainManager.shared.readCredential(for: host.keychainAccountKey)
+        let env = SSHAskPassHelper.shared.buildEnvironment(secret: secret)
 
         // startProcess é adiado 1 ciclo para container ter frame válido
         DispatchQueue.main.async {

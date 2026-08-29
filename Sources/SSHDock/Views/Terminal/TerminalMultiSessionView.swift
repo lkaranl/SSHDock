@@ -43,9 +43,10 @@ public final class TerminalMultiSessionContainerView: NSView {
                 // Associa o delegate à view via propriedade dinâmica para evitar deinit
                 objc_setAssociatedObject(tv, &AssociatedKeys.delegateKey, sessionDelegate, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
                 
-                // Prepara variáveis de ambiente UTF-8 e argumentos SSH
+                // Prepara variáveis de ambiente com suporte UTF-8 e autenticação segura via SSH_ASKPASS
+                let secret = KeychainManager.shared.readCredential(for: session.host.keychainAccountKey)
                 let args = buildSSHArgs(for: session.host)
-                let env = buildUTF8Environment()
+                let env = SSHAskPassHelper.shared.buildEnvironment(secret: secret)
                 
                 addSubview(tv)
                 terminalViews[session.id] = tv
@@ -59,13 +60,6 @@ public final class TerminalMultiSessionContainerView: NSView {
                         execName: nil
                     )
                     onStateChanged(session.id, .connected)
-                    
-                    // Se houver senha/passphrase salva no Keychain, envia automaticamente após a abertura do PTY
-                    if let secret = KeychainManager.shared.readCredential(for: session.host.keychainAccountKey), !secret.isEmpty {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                            tv.send(txt: "\(secret)\n")
-                        }
-                    }
                 }
             }
         }
@@ -111,16 +105,6 @@ public final class TerminalMultiSessionContainerView: NSView {
         }
         args.append("\(host.username)@\(host.hostname)")
         return args
-    }
-    
-    private func buildUTF8Environment() -> [String] {
-        var envDict = ProcessInfo.processInfo.environment
-        envDict["TERM"] = "xterm-256color"
-        envDict["COLORTERM"] = "truecolor"
-        envDict["LANG"] = "en_US.UTF-8"
-        envDict["LC_ALL"] = "en_US.UTF-8"
-        envDict["LC_CTYPE"] = "en_US.UTF-8"
-        return envDict.map { "\($0.key)=\($0.value)" }
     }
 }
 

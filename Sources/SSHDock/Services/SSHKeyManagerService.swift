@@ -98,7 +98,7 @@ public final class SSHKeyManagerService {
         // Script remoto que adiciona a chave ao ~/.ssh/authorized_keys com permissões corretas
         let remoteCommand = "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '\(pubKeyContent)' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
         
-        // Se houver senha salva no Keychain, tenta enviar a chave diretamente
+        // Configura processo SSH com suporte a autenticação segura via SSH_ASKPASS caso haja senha
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
         let args = [
@@ -108,6 +108,16 @@ public final class SSHKeyManagerService {
             remoteCommand
         ]
         process.arguments = args
+        
+        var env = ProcessInfo.processInfo.environment
+        if let password = password, !password.isEmpty {
+            let askPassPath = SSHAskPassHelper.shared.ensureAskPassScriptExists()
+            env["SSH_ASKPASS"] = askPassPath
+            env["SSH_ASKPASS_REQUIRE"] = "force"
+            env["SSHDOCK_AUTH_SECRET"] = password
+            env["DISPLAY"] = ":0"
+        }
+        process.environment = env
         
         let pipe = Pipe()
         process.standardError = pipe
