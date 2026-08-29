@@ -9,6 +9,7 @@ public class StorageManager {
     private let hostsFileURL: URL
     private let groupsFileURL: URL
     private let snippetsFileURL: URL
+    private let shortcutsFileURL: URL
     
     private init() {
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -21,6 +22,7 @@ public class StorageManager {
         hostsFileURL = appFolderURL.appendingPathComponent("hosts.json")
         groupsFileURL = appFolderURL.appendingPathComponent("groups.json")
         snippetsFileURL = appFolderURL.appendingPathComponent("snippets.json")
+        shortcutsFileURL = appFolderURL.appendingPathComponent("shortcuts.json")
     }
     
     // MARK: - Hosts
@@ -65,6 +67,21 @@ public class StorageManager {
     public func saveSnippets(_ snippets: [Snippet]) {
         if let data = try? JSONEncoder().encode(snippets) {
             try? data.write(to: snippetsFileURL, options: .atomic)
+        }
+    }
+    
+    // MARK: - Custom Shortcuts
+    public func loadShortcuts() -> [CustomShortcut] {
+        guard let data = try? Data(contentsOf: shortcutsFileURL),
+              let shortcuts = try? JSONDecoder().decode([CustomShortcut].self, from: data) else {
+            return []
+        }
+        return shortcuts
+    }
+    
+    public func saveShortcuts(_ shortcuts: [CustomShortcut]) {
+        if let data = try? JSONEncoder().encode(shortcuts) {
+            try? data.write(to: shortcutsFileURL, options: .atomic)
         }
     }
 }

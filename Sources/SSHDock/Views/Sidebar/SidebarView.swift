@@ -30,7 +30,7 @@ public struct SidebarView: View {
                 .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
                 .cornerRadius(8)
                 
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Button {
                         viewModel.hostToEdit = nil
                         viewModel.isPresentingHostForm = true
@@ -46,11 +46,21 @@ public struct SidebarView: View {
                         viewModel.isPresentingGroupForm = true
                     } label: {
                         Image(systemName: "folder.badge.plus")
-                            .font(.system(size: 13))
+                            .font(.system(size: 12))
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .help("Novo Grupo")
+                    
+                    Button {
+                        viewModel.isPresentingShortcutsSheet = true
+                    } label: {
+                        Image(systemName: "keyboard.fill")
+                            .font(.system(size: 12))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("Atalhos de Teclado (⌘ ⌥ K)")
                 }
             }
             .padding(10)
@@ -130,6 +140,9 @@ public struct SidebarView: View {
         }
         .sheet(isPresented: $viewModel.isPresentingGroupForm) {
             GroupFormView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $viewModel.isPresentingShortcutsSheet) {
+            ShortcutsManagerView(viewModel: viewModel)
         }
     }
 }

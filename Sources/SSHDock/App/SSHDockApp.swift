@@ -42,6 +42,13 @@ struct SSHDockApp: App {
                 }
                 .keyboardShortcut("0", modifiers: .command)
             }
+            
+            CommandGroup(replacing: .help) {
+                Button("Atalhos de Teclado...") {
+                    NotificationCenter.default.post(name: .openShortcutsManager, object: nil)
+                }
+                .keyboardShortcut("k", modifiers: [.command, .option])
+            }
         }
     }
 }

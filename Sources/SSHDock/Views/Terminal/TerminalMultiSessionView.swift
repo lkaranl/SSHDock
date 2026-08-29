@@ -46,20 +46,31 @@ public final class TerminalMultiSessionContainerView: NSView {
     }
     
     override public func performKeyEquivalent(with event: NSEvent) -> Bool {
-        guard event.modifierFlags.contains(.command) else {
-            return super.performKeyEquivalent(with: event)
+        // 1. Atalhos de Zoom de fonte
+        if event.modifierFlags.contains(.command) {
+            let chars = event.charactersIgnoringModifiers ?? ""
+            if chars == "+" || chars == "=" {
+                TerminalFontManager.shared.increaseFontSize()
+                return true
+            } else if chars == "-" {
+                TerminalFontManager.shared.decreaseFontSize()
+                return true
+            } else if chars == "0" {
+                TerminalFontManager.shared.resetFontSize()
+                return true
+            }
         }
         
-        let chars = event.charactersIgnoringModifiers ?? ""
-        if chars == "+" || chars == "=" {
-            TerminalFontManager.shared.increaseFontSize()
-            return true
-        } else if chars == "-" {
-            TerminalFontManager.shared.decreaseFontSize()
-            return true
-        } else if chars == "0" {
-            TerminalFontManager.shared.resetFontSize()
-            return true
+        // 2. Atalhos Customizados Cadastrados
+        let customShortcuts = StorageManager.shared.loadShortcuts()
+        for shortcut in customShortcuts where shortcut.isEnabled {
+            if shortcut.matches(event: event) {
+                if let selectedId = currentSelectedId, let tv = terminalViews[selectedId] {
+                    let cmd = shortcut.autoExecute ? "\(shortcut.command)\n" : shortcut.command
+                    tv.send(txt: cmd)
+                    return true
+                }
+            }
         }
         
         return super.performKeyEquivalent(with: event)

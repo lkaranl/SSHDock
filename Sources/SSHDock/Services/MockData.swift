@@ -54,4 +54,11 @@ public struct MockData {
         Snippet(name: "Logs do Kernel", command: "sudo dmesg -T | tail -n 50", iconName: "list.bullet.rectangle.fill", autoExecute: false),
         Snippet(name: "Uso de Memória", command: "free -h", iconName: "memorychip")
     ]
+    
+    public static let sampleShortcuts: [CustomShortcut] = [
+        CustomShortcut(name: "Limpar Tela", command: "clear", key: "k", modifiers: [.control], autoExecute: true),
+        CustomShortcut(name: "Status do Docker", command: "docker ps", key: "d", modifiers: [.option], autoExecute: true),
+        CustomShortcut(name: "Monitor de Processos", command: "htop", key: "h", modifiers: [.option], autoExecute: true),
+        CustomShortcut(name: "Uso de Disco", command: "df -h", key: "u", modifiers: [.option], autoExecute: true)
+    ]
 }

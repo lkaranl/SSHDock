@@ -1,11 +1,12 @@
-import Foundation
-import Combine
-import SwiftUI
+public extension Notification.Name {
+    static let openShortcutsManager = Notification.Name("SSHDockOpenShortcutsManager")
+}
 
 public class AppViewModel: ObservableObject {
     @Published public var groups: [HostGroup] = []
     @Published public var hosts: [Host] = []
     @Published public var snippets: [Snippet] = []
+    @Published public var customShortcuts: [CustomShortcut] = []
     
     @Published public var activeSessions: [SSHSession] = []
     @Published public var selectedSessionId: UUID?
@@ -19,29 +20,41 @@ public class AppViewModel: ObservableObject {
     @Published public var hostToEdit: Host? = nil
     @Published public var isPresentingGroupForm: Bool = false
     @Published public var isPresentingSnippetForm: Bool = false
+    @Published public var isPresentingShortcutsSheet: Bool = false
     
     private let storage = StorageManager.shared
     private let keychain = KeychainManager.shared
     
     public init() {
         loadData()
+        
+        NotificationCenter.default.addObserver(
+            forName: .openShortcutsManager,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.isPresentingShortcutsSheet = true
+        }
     }
     
     public func loadData() {
         let loadedGroups = storage.loadGroups()
         let loadedHosts = storage.loadHosts()
         let loadedSnippets = storage.loadSnippets()
+        let loadedShortcuts = storage.loadShortcuts()
         
         if loadedGroups.isEmpty && loadedHosts.isEmpty {
             // Inicializa com dados de demonstração
             self.groups = MockData.sampleGroups
             self.hosts = MockData.sampleHosts
             self.snippets = MockData.sampleSnippets
+            self.customShortcuts = MockData.sampleShortcuts
             saveData()
         } else {
             self.groups = loadedGroups
             self.hosts = loadedHosts
             self.snippets = loadedSnippets.isEmpty ? MockData.sampleSnippets : loadedSnippets
+            self.customShortcuts = loadedShortcuts.isEmpty ? MockData.sampleShortcuts : loadedShortcuts
         }
     }
     
@@ -49,6 +62,7 @@ public class AppViewModel: ObservableObject {
         storage.saveGroups(groups)
         storage.saveHosts(hosts)
         storage.saveSnippets(snippets)
+        storage.saveShortcuts(customShortcuts)
     }
     
     // MARK: - Gestão de Hosts
@@ -103,6 +117,31 @@ public class AppViewModel: ObservableObject {
     public func deleteSnippet(_ snippet: Snippet) {
         snippets.removeAll { $0.id == snippet.id }
         saveData()
+    }
+    
+    // MARK: - Gestão de Atalhos Customizados
+    public func addCustomShortcut(_ shortcut: CustomShortcut) {
+        customShortcuts.append(shortcut)
+        saveData()
+    }
+    
+    public func updateCustomShortcut(_ shortcut: CustomShortcut) {
+        if let index = customShortcuts.firstIndex(where: { $0.id == shortcut.id }) {
+            customShortcuts[index] = shortcut
+            saveData()
+        }
+    }
+    
+    public func deleteCustomShortcut(_ shortcut: CustomShortcut) {
+        customShortcuts.removeAll { $0.id == shortcut.id }
+        saveData()
+    }
+    
+    public func toggleCustomShortcut(_ shortcut: CustomShortcut) {
+        if let index = customShortcuts.firstIndex(where: { $0.id == shortcut.id }) {
+            customShortcuts[index].isEnabled.toggle()
+            saveData()
+        }
     }
     
     // MARK: - Controle de Sessões SSH / Abas
