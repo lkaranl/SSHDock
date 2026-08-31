@@ -34,13 +34,15 @@ public struct TerminalTabBarView: View {
     private func singleTab(host: Host, session: SSHSession) -> some View {
         let isSelected = viewModel.selectedSessionId == session.id
         
-        return HStack(spacing: 6) {
-            Image(systemName: session.state.iconName)
-                .font(.system(size: 10))
-                .foregroundColor(statusColor(for: session.state))
+        return HStack(spacing: 7) {
+            // Indicador de Status
+            Circle()
+                .fill(statusColor(for: session.state))
+                .frame(width: 7, height: 7)
+                .shadow(color: statusColor(for: session.state).opacity(isSelected ? 0.6 : 0), radius: 2)
             
             Text(host.name)
-                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                .font(.system(size: 12, weight: isSelected ? .bold : .medium))
                 .foregroundColor(isSelected ? .primary : .secondary)
                 .lineLimit(1)
             
@@ -49,10 +51,10 @@ public struct TerminalTabBarView: View {
                 viewModel.openSession(for: host, forceNew: true)
             } label: {
                 Image(systemName: "plus")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(.secondary)
-                    .padding(2)
-                    .background(Color.secondary.opacity(0.1))
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(isSelected ? .primary : .secondary)
+                    .padding(3)
+                    .background(isSelected ? Color.primary.opacity(0.1) : Color.secondary.opacity(0.1))
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
@@ -64,21 +66,32 @@ public struct TerminalTabBarView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(.secondary)
-                    .padding(2)
-                    .background(Color.secondary.opacity(0.1))
+                    .foregroundColor(isSelected ? .primary : .secondary)
+                    .padding(3)
+                    .background(isSelected ? Color.primary.opacity(0.1) : Color.secondary.opacity(0.1))
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
             .help("Fechar Sessão (⌘ W)")
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(isSelected ? Color(NSColor.windowBackgroundColor) : Color.primary.opacity(0.04))
-        .cornerRadius(6, corners: [.topLeft, .topRight])
+        .padding(.vertical, 6)
+        .background(
+            isSelected
+                ? Color(NSColor.textBackgroundColor)
+                : Color(NSColor.controlBackgroundColor).opacity(0.5)
+        )
+        .cornerRadius(7, corners: [.topLeft, .topRight])
         .overlay(
-            RoundedCornerShape(radius: 6, corners: [.topLeft, .topRight])
-                .stroke(isSelected ? Color.primary.opacity(0.1) : Color.clear, lineWidth: 1)
+            RoundedCornerShape(radius: 7, corners: [.topLeft, .topRight])
+                .stroke(
+                    isSelected ? Color.accentColor.opacity(0.7) : Color.primary.opacity(0.1),
+                    lineWidth: isSelected ? 1.5 : 1
+                )
+        )
+        .shadow(
+            color: isSelected ? Color.accentColor.opacity(0.15) : Color.clear,
+            radius: 4, x: 0, y: 1
         )
         .onTapGesture {
             viewModel.selectedSessionId = session.id
@@ -102,16 +115,16 @@ public struct TerminalTabBarView: View {
     private func groupedTabs(host: Host, sessions: [SSHSession]) -> some View {
         let isAnySelected = sessions.contains(where: { $0.id == viewModel.selectedSessionId })
         
-        return HStack(spacing: 4) {
-            // Cabeçalho do Grupo do Servidor
-            HStack(spacing: 4) {
+        return HStack(spacing: 5) {
+            // Cabeçalho do Grupo do Servidor (Aba Pai)
+            HStack(spacing: 5) {
                 Image(systemName: "server.rack")
-                    .font(.system(size: 9))
-                    .foregroundColor(.accentColor)
+                    .font(.system(size: 10, weight: isAnySelected ? .bold : .regular))
+                    .foregroundColor(isAnySelected ? .accentColor : .secondary)
                 
                 Text(host.name)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.primary)
+                    .font(.system(size: 11, weight: isAnySelected ? .bold : .semibold))
+                    .foregroundColor(isAnySelected ? .accentColor : .primary)
                     .lineLimit(1)
                 
                 Button {
@@ -119,50 +132,72 @@ public struct TerminalTabBarView: View {
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.accentColor)
-                        .padding(2)
-                        .background(Color.accentColor.opacity(0.12))
+                        .foregroundColor(isAnySelected ? .white : .secondary)
+                        .padding(3)
+                        .background(isAnySelected ? Color.accentColor : Color.secondary.opacity(0.15))
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .help("Nova aba em \(host.name) (⌘ T)")
             }
-            .padding(.leading, 6)
-            .padding(.trailing, 2)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                isAnySelected
+                    ? Color.accentColor.opacity(0.15)
+                    : Color.primary.opacity(0.04)
+            )
+            .cornerRadius(5)
             
-            // Sub-abas numeradas (#1, #2, #3...)
+            // Divisória sutil
+            Rectangle()
+                .fill(isAnySelected ? Color.accentColor.opacity(0.4) : Color.primary.opacity(0.12))
+                .frame(width: 1, height: 16)
+            
+            // Sub-abas (#1, #2, #3...)
             ForEach(Array(sessions.enumerated()), id: \.element.id) { index, session in
                 let isSelected = viewModel.selectedSessionId == session.id
                 
-                HStack(spacing: 4) {
-                    Image(systemName: session.state.iconName)
-                        .font(.system(size: 8))
-                        .foregroundColor(statusColor(for: session.state))
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(isSelected ? Color.white : statusColor(for: session.state))
+                        .frame(width: 6, height: 6)
                     
                     Text("#\(index + 1)")
                         .font(.system(size: 11, weight: isSelected ? .bold : .medium))
-                        .foregroundColor(isSelected ? .primary : .secondary)
+                        .foregroundColor(isSelected ? .white : .primary)
                     
                     Button {
                         viewModel.closeSession(id: session.id)
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 7, weight: .bold))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
                             .padding(2)
-                            .background(Color.secondary.opacity(0.15))
+                            .background(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.15))
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
                     .help("Fechar Aba #\(index + 1)")
                 }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(isSelected ? Color(NSColor.windowBackgroundColor) : Color.primary.opacity(0.06))
-                .cornerRadius(4)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(
+                    isSelected
+                        ? Color.accentColor
+                        : Color(NSColor.textBackgroundColor).opacity(0.6)
+                )
+                .cornerRadius(5)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(isSelected ? Color.accentColor.opacity(0.4) : Color.clear, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 5)
+                        .stroke(
+                            isSelected ? Color.accentColor : Color.primary.opacity(0.1),
+                            lineWidth: 1
+                        )
+                )
+                .shadow(
+                    color: isSelected ? Color.accentColor.opacity(0.3) : Color.clear,
+                    radius: 3, x: 0, y: 1
                 )
                 .onTapGesture {
                     viewModel.selectedSessionId = session.id
@@ -187,13 +222,24 @@ public struct TerminalTabBarView: View {
                 }
             }
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 6)
         .padding(.vertical, 4)
-        .background(isAnySelected ? Color.primary.opacity(0.06) : Color.primary.opacity(0.02))
-        .cornerRadius(6, corners: [.topLeft, .topRight])
+        .background(
+            isAnySelected
+                ? Color(NSColor.textBackgroundColor)
+                : Color(NSColor.controlBackgroundColor).opacity(0.4)
+        )
+        .cornerRadius(7, corners: [.topLeft, .topRight])
         .overlay(
-            RoundedCornerShape(radius: 6, corners: [.topLeft, .topRight])
-                .stroke(isAnySelected ? Color.primary.opacity(0.15) : Color.primary.opacity(0.08), lineWidth: 1)
+            RoundedCornerShape(radius: 7, corners: [.topLeft, .topRight])
+                .stroke(
+                    isAnySelected ? Color.accentColor.opacity(0.7) : Color.primary.opacity(0.12),
+                    lineWidth: isAnySelected ? 1.5 : 1
+                )
+        )
+        .shadow(
+            color: isAnySelected ? Color.accentColor.opacity(0.15) : Color.clear,
+            radius: 5, x: 0, y: 1
         )
     }
     
