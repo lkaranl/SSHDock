@@ -1,6 +1,6 @@
 # SSHDock 🚀
 
-O **SSHDock** é um gerenciador de sessões SSH nativo para macOS. Projetado com **SwiftUI** e **SwiftTerm**, ele oferece uma experiência moderna, minimalista e rápida para gerenciar e conectar a todos os seus servidores em um único lugar.
+O **SSHDock** é um gerenciadores de sessões SSH nativo para macOS. Projetado com **SwiftUI** e **SwiftTerm**, ele oferece uma experiência moderna, minimalista e rápida para gerenciar e conectar a todos os seus servidores em um único lugar.
 
 ---
 
