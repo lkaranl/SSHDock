@@ -3,6 +3,8 @@ import Foundation
 public enum AuthenticationMethod: Codable, Hashable, Equatable {
     case password
     case sshKey(keyPath: String)
+    /// Autenticação delegada ao ssh-agent (ssh-add, 1Password, Secretive etc.)
+    case agent(agentSocket: String?)
     
     public var title: String {
         switch self {
@@ -10,6 +12,20 @@ public enum AuthenticationMethod: Codable, Hashable, Equatable {
             return "Senha"
         case .sshKey:
             return "Chave SSH"
+        case .agent:
+            return "Agente SSH"
+        }
+    }
+    
+    /// Ícone SF Symbol representando o método de autenticação
+    public var iconName: String {
+        switch self {
+        case .password:
+            return "lock.fill"
+        case .sshKey:
+            return "key.fill"
+        case .agent:
+            return "person.badge.key.fill"
         }
     }
 }

@@ -19,6 +19,12 @@ public class TerminalViewModel: ObservableObject {
         // Porta
         args.append(contentsOf: ["-p", "\(host.port)"])
         
+        // Timeouts: se o host estiver inacessível, o ssh encerra rápido (exit 255)
+        // em vez de ficar pendurado indefinidamente no TCP connect.
+        args.append(contentsOf: ["-o", "ConnectTimeout=10"])
+        args.append(contentsOf: ["-o", "ServerAliveInterval=15"])
+        args.append(contentsOf: ["-o", "ServerAliveCountMax=3"])
+        
         // Aceita novas chaves automaticamente para evitar bloqueio silencioso
         args.append(contentsOf: ["-o", "StrictHostKeyChecking=accept-new"])
         
@@ -36,14 +42,28 @@ public class TerminalViewModel: ObservableObject {
         return ("/usr/bin/ssh", args)
     }
     
-    /// Obtém variáveis de ambiente otimizadas com suporte a UTF-8, 256 cores e SSH_ASKPASS seguro
+    /// Obtém variáveis de ambiente otimizadas com suporte a UTF-8, 256 cores e
+    /// autenticação de acordo com o método do host (SSH_ASKPASS ou ssh-agent)
     public func buildEnvironment() -> [String] {
-        let secret = getSecretFromKeychain()
-        return SSHAskPassHelper.shared.buildEnvironment(secret: secret)
+        return Self.buildConnectionEnvironment(for: session.host)
     }
 
     /// Busca senha/passphrase do Keychain para o host
     public func getSecretFromKeychain() -> String? {
         return keychain.readCredential(for: session.host.keychainAccountKey)
+    }
+    
+    /// Constrói o ambiente de conexão de acordo com o método de autenticação do host:
+    /// - Senha/Chave SSH: usa SSH_ASKPASS com o segredo do Keychain
+    /// - Agente SSH (ssh-add, 1Password, Secretive etc.): usa SSH_AUTH_SOCK do agente,
+    ///   sem configurar SSH_ASKPASS (o agente responde os desafios de autenticação)
+    public static func buildConnectionEnvironment(for host: Host) -> [String] {
+        switch host.authMethod {
+        case .agent(let agentSocket):
+            return SSHAskPassHelper.shared.buildEnvironment(secret: nil, sshAuthSock: agentSocket)
+        case .password, .sshKey:
+            let secret = KeychainManager.shared.readCredential(for: host.keychainAccountKey)
+            return SSHAskPassHelper.shared.buildEnvironment(secret: secret)
+        }
     }
 }

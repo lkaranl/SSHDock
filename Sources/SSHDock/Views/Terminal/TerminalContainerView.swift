@@ -40,9 +40,63 @@ public struct TerminalContainerView: View {
                     }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay {
+                    if let selected = viewModel.activeSessions.first(where: { $0.id == viewModel.selectedSessionId }),
+                       case .failed(let message) = selected.state {
+                        connectionFailureOverlay(message: message, sessionId: selected.id)
+                    }
+                }
             }
         }
         .background(Color(NSColor.textBackgroundColor))
+    }
+    
+    // MARK: - Overlay de Falha de Conexão
+    private func connectionFailureOverlay(message: String, sessionId: UUID) -> some View {
+        ZStack {
+            Color.black.opacity(0.55)
+            
+            VStack(spacing: 16) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 40, weight: .light))
+                    .foregroundColor(.yellow)
+                
+                Text("Falha na Conexão")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Text(message)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 380)
+                
+                HStack(spacing: 12) {
+                    Button {
+                        viewModel.closeSession(id: sessionId)
+                    } label: {
+                        Label("Fechar Aba", systemImage: "xmark.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Button {
+                        viewModel.reconnectSession(id: sessionId)
+                    } label: {
+                        Label("Reconectar", systemImage: "arrow.clockwise.circle.fill")
+                            .font(.headline)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                }
+                .padding(.top, 4)
+            }
+            .padding(28)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(.regularMaterial)
+                    .shadow(color: .black.opacity(0.3), radius: 18, y: 6)
+            )
+        }
     }
     
     private var emptyStateView: some View {

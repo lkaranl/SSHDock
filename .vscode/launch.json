@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:SSHDock}",
+            "name": "Debug SSHDock",
+            "target": "SSHDock",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug SSHDock"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:SSHDock}",
+            "name": "Release SSHDock",
+            "target": "SSHDock",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release SSHDock"
+        }
+    ]
+}

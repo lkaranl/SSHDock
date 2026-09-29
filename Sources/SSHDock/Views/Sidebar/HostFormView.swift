@@ -10,8 +10,9 @@ public struct HostFormView: View {
     @State private var hostname: String = ""
     @State private var portString: String = "22"
     @State private var username: String = ""
-    @State private var authSelection: Int = 0 // 0 = Senha, 1 = Chave SSH
+    @State private var authSelection: Int = 0 // 0 = Senha, 1 = Chave SSH, 2 = Agente SSH
     @State private var sshKeyPath: String = "~/.ssh/id_rsa"
+    @State private var agentSocket: String = "" // Socket do ssh-agent (opcional)
     @State private var secretCredential: String = "" // Senha ou Passphrase da Chave
     @State private var selectedGroupId: UUID? = nil
     @State private var isPresentingDeleteAlert: Bool = false
@@ -167,9 +168,37 @@ public struct HostFormView: View {
                 HStack(spacing: 10) {
                     authOptionButton(title: "Senha", icon: "lock.fill", tag: 0)
                     authOptionButton(title: "Chave SSH", icon: "key.fill", tag: 1)
+                    authOptionButton(title: "Agente", icon: "person.badge.key.fill", tag: 2)
                 }
                 
                 Divider().opacity(0.5)
+                
+                if authSelection == 2 {
+                    // Modo Agente SSH: socket opcional + orientação
+                    formRow(icon: "wireless", color: .teal, title: "Socket (opcional)") {
+                        TextField(
+                            "vazio = agente do sistema; ex: 1Password, Secretive...",
+                            text: $agentSocket
+                        )
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12))
+                    }
+                    
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle.fill")
+                            .foregroundColor(.accentColor)
+                            .font(.system(size: 12))
+                        
+                        Text("As chaves devem estar carregadas no agente (ssh-add, 1Password, Secretive etc.). A senha/prompt do agente aparece no próprio terminal.")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                    }
+                    .padding(.top, 4)
+                    
+                    Divider().opacity(0.5)
+                }
                 
                 if authSelection == 1 {
                     formRow(icon: "doc.text.fill", color: .indigo, title: "Caminho da Chave") {
@@ -229,28 +258,30 @@ public struct HostFormView: View {
                     Divider().opacity(0.5)
                 }
                 
-                // Campo de Senha/Passphrase
-                formRow(icon: authSelection == 0 ? "key.fill" : "lock.rotation", color: .red, title: authSelection == 0 ? "Senha" : "Passphrase") {
-                    SecureField(
-                        authSelection == 0 ? "Senha do usuário" : "Passphrase da chave (opcional)",
-                        text: $secretCredential
-                    )
-                    .textFieldStyle(.plain)
-                }
-                
-                // Badge Informativo do Keychain
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.shield.fill")
-                        .foregroundColor(.green)
-                        .font(.system(size: 12))
+                // Campo de Senha/Passphrase (apenas para Senha e Chave SSH)
+                if authSelection != 2 {
+                    formRow(icon: authSelection == 0 ? "key.fill" : "lock.rotation", color: .red, title: authSelection == 0 ? "Senha" : "Passphrase") {
+                        SecureField(
+                            authSelection == 0 ? "Senha do usuário" : "Passphrase da chave (opcional)",
+                            text: $secretCredential
+                        )
+                        .textFieldStyle(.plain)
+                    }
                     
-                    Text("Protegido por criptografia nativa no Apple Keychain")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.secondary)
-                    
-                    Spacer()
+                    // Badge Informativo do Keychain
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.shield.fill")
+                            .foregroundColor(.green)
+                            .font(.system(size: 12))
+                        
+                        Text("Protegido por criptografia nativa no Apple Keychain")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                    }
+                    .padding(.top, 4)
                 }
-                .padding(.top, 4)
             }
             .padding(12)
             .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
@@ -377,6 +408,9 @@ public struct HostFormView: View {
         case .sshKey(let keyPath):
             authSelection = 1
             sshKeyPath = keyPath
+        case .agent(let agentSocketPath):
+            authSelection = 2
+            agentSocket = agentSocketPath ?? ""
         }
         
         if let existingSecret = KeychainManager.shared.readCredential(for: host.keychainAccountKey) {
@@ -386,9 +420,16 @@ public struct HostFormView: View {
     
     private func saveHost() {
         let port = Int(portString) ?? 22
-        let authMethod: AuthenticationMethod = (authSelection == 0)
-            ? .password
-            : .sshKey(keyPath: sshKeyPath)
+        let trimmedSocket = agentSocket.trimmingCharacters(in: .whitespaces)
+        let authMethod: AuthenticationMethod
+        switch authSelection {
+        case 0:
+            authMethod = .password
+        case 2:
+            authMethod = .agent(agentSocket: trimmedSocket.isEmpty ? nil : trimmedSocket)
+        default:
+            authMethod = .sshKey(keyPath: sshKeyPath)
+        }
         
         let keychainKey = hostToEdit?.keychainAccountKey ?? UUID().uuidString
         
@@ -404,6 +445,11 @@ public struct HostFormView: View {
             createdAt: hostToEdit?.createdAt ?? Date(),
             updatedAt: Date()
         )
+        
+        // Ao migrar para o modo Agente, remove credencial antiga do Keychain (se existir)
+        if case .agent = authMethod {
+            viewModel.removeHostCredential(for: newHost)
+        }
         
         let secretToSave = secretCredential.isEmpty ? nil : secretCredential
         viewModel.addOrUpdateHost(newHost, secretCredential: secretToSave)

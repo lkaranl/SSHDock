@@ -68,7 +68,7 @@ public final class TerminalMultiSessionContainerView: NSView {
         }
         
         // 2. Atalhos Customizados Cadastrados
-        let customShortcuts = StorageManager.shared.loadShortcuts()
+        let customShortcuts = StorageManager.shared.safeLoadShortcuts()
         for shortcut in customShortcuts where shortcut.isEnabled {
             if shortcut.matches(event: event) {
                 if let selectedId = currentSelectedId, let tv = terminalViews[selectedId] {
@@ -122,10 +122,10 @@ public final class TerminalMultiSessionContainerView: NSView {
                 // Associa o delegate à view via propriedade dinâmica para evitar deinit
                 objc_setAssociatedObject(tv, &AssociatedKeys.delegateKey, sessionDelegate, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
                 
-                // Prepara variáveis de ambiente com suporte UTF-8 e autenticação segura via SSH_ASKPASS
-                let secret = KeychainManager.shared.readCredential(for: session.host.keychainAccountKey)
+                // Prepara variáveis de ambiente de acordo com o método de autenticação
+                // (SSH_ASKPASS + Keychain para senha/chave; SSH_AUTH_SOCK para agente)
+                let env = TerminalViewModel.buildConnectionEnvironment(for: session.host)
                 let args = buildSSHArgs(for: session.host)
-                let env = SSHAskPassHelper.shared.buildEnvironment(secret: secret)
                 
                 addSubview(tv)
                 terminalViews[session.id] = tv
@@ -138,7 +138,11 @@ public final class TerminalMultiSessionContainerView: NSView {
                         environment: env,
                         execName: nil
                     )
-                    onStateChanged(session.id, .connected)
+                    // Sessão inicia como .connecting; o watchdog do delegate
+                    // marca .connected (processo vivo após timeout) ou .failed
+                    // (processo morreu antes de estabelecer a conexão).
+                    onStateChanged(session.id, .connecting)
+                    sessionDelegate.scheduleConnectionWatchdog()
                 }
             }
         }
@@ -171,11 +175,19 @@ public final class TerminalMultiSessionContainerView: NSView {
         }
     }
     
+    /// Argumentos SSH com timeout de conexão: se o host estiver inacessível,
+    /// o próprio /usr/bin/ssh encerra rápido (exit 255) em vez de ficar pendurado.
     private func buildSSHArgs(for host: Host) -> [String] {
         var args: [String] = []
-        args.reserveCapacity(10)
+        args.reserveCapacity(16)
         args.append("-p")
         args.append("\(host.port)")
+        args.append("-o")
+        args.append("ConnectTimeout=10")
+        args.append("-o")
+        args.append("ServerAliveInterval=15")
+        args.append("-o")
+        args.append("ServerAliveCountMax=3")
         args.append("-o")
         args.append("StrictHostKeyChecking=accept-new")
         if case .sshKey(let keyPath) = host.authMethod, !keyPath.isEmpty {
@@ -193,13 +205,32 @@ private struct AssociatedKeys {
     static var delegateKey: UInt8 = 0
 }
 
+/// Timeout (em segundos) aguardado antes de considerar a conexão estabelecida.
+/// Se o processo SSH ainda estiver vivo após esse período, assume-se conectado.
+private let connectionWatchdogTimeout: TimeInterval = 15
+
 private final class SingleSessionDelegate: NSObject, LocalProcessTerminalViewDelegate {
     let sessionId: UUID
     let onStateChanged: (UUID, ConnectionState) -> Void
     
+    /// Indica se o processo SSH já encerrou (falha ou saída normal)
+    var wasTerminated = false
+    /// Indica se a conexão já foi considerada estabelecida (watchdog disparou)
+    var connectionEstablished = false
+    
     init(sessionId: UUID, onStateChanged: @escaping (UUID, ConnectionState) -> Void) {
         self.sessionId = sessionId
         self.onStateChanged = onStateChanged
+    }
+    
+    /// Agenda o watchdog de conexão: se o processo continuar vivo após o timeout,
+    /// marca como conectado; se o processo morrer antes, marca como falhou.
+    func scheduleConnectionWatchdog() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + connectionWatchdogTimeout) { [weak self] in
+            guard let self, !self.wasTerminated, !self.connectionEstablished else { return }
+            self.connectionEstablished = true
+            self.onStateChanged(self.sessionId, .connected)
+        }
     }
     
     func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
@@ -207,8 +238,16 @@ private final class SingleSessionDelegate: NSObject, LocalProcessTerminalViewDel
     
     func processTerminated(source: TerminalView, exitCode: Int32?) {
         DispatchQueue.main.async {
-            if let code = exitCode, code != 0 {
-                self.onStateChanged(self.sessionId, .failed("Processo finalizado com código \(code)"))
+            self.wasTerminated = true
+            
+            // Falha durante a conexão (host inacessível, porta errada, timeout etc.)
+            if !self.connectionEstablished, let code = exitCode, code != 0 {
+                let reason = code == 255
+                    ? "Não foi possível conectar ao host. Verifique host, porta e credenciais."
+                    : "Processo finalizado com código \(code)"
+                self.onStateChanged(self.sessionId, .failed(reason))
+            } else if let code = exitCode, code != 0 {
+                self.onStateChanged(self.sessionId, .failed("Sessão encerrada com código \(code)"))
             } else {
                 self.onStateChanged(self.sessionId, .disconnected)
             }

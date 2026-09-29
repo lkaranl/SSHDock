@@ -53,8 +53,10 @@ public final class SSHAskPassHelper {
         return scriptPath
     }
     
-    /// Constrói o array de variáveis de ambiente com suporte a UTF-8, cores e SSH_ASKPASS se houver credencial.
-    public func buildEnvironment(secret: String? = nil) -> [String] {
+    /// Constrói o array de variáveis de ambiente com suporte a UTF-8, cores, SSH_ASKPASS (senha/passphrase)
+    /// e SSH_AUTH_SOCK (ssh-agent: 1Password, Secretive, ssh-add etc.).
+    /// Em modo agente, `secret` deve ser nil para NÃO configurar o SSH_ASKPASS.
+    public func buildEnvironment(secret: String? = nil, sshAuthSock: String? = nil) -> [String] {
         var envDict = ProcessInfo.processInfo.environment
         envDict["TERM"] = "xterm-256color"
         envDict["COLORTERM"] = "truecolor"
@@ -68,6 +70,11 @@ public final class SSHAskPassHelper {
             envDict["SSH_ASKPASS_REQUIRE"] = "force"
             envDict["SSHDOCK_AUTH_SECRET"] = secret
             envDict["DISPLAY"] = ":0"
+        }
+        
+        if let sock = sshAuthSock, !sock.isEmpty {
+            let expandedSock = NSString(string: sock).expandingTildeInPath
+            envDict["SSH_AUTH_SOCK"] = expandedSock
         }
         
         return envDict.map { "\($0.key)=\($0.value)" }

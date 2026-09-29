@@ -102,4 +102,38 @@ public class KeychainManager {
             throw KeychainError.unhandledError(status: status)
         }
     }
+    
+    /// Lista todas as contas (account keys) de credenciais deste app no Keychain
+    public func allAccountKeys() -> [String] {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: serviceName,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll
+        ]
+        
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let items = result as? [[String: Any]] else {
+            return []
+        }
+        return items.compactMap { $0[kSecAttrAccount as String] as? String }
+    }
+    
+    /// Remove credenciais órfãs (cujo account key não pertence a nenhum host válido).
+    /// Retorna a quantidade de credenciais removidas.
+    @discardableResult
+    public func deleteOrphanCredentials(keeping validAccounts: Set<String>) -> Int {
+        var removed = 0
+        for account in allAccountKeys() where !validAccounts.contains(account) {
+            do {
+                try deleteCredential(for: account)
+                removed += 1
+            } catch {
+                // Não interrompe a limpeza; tenta remover as demais
+                continue
+            }
+        }
+        return removed
+    }
 }

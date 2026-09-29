@@ -64,7 +64,7 @@ public final class ThrottledTerminalContainer: NSView {
         }
         
         // 2. Atalhos Customizados Cadastrados
-        let customShortcuts = StorageManager.shared.loadShortcuts()
+        let customShortcuts = StorageManager.shared.safeLoadShortcuts()
         for shortcut in customShortcuts where shortcut.isEnabled {
             if shortcut.matches(event: event) {
                 if let tv = terminalView {
@@ -169,10 +169,13 @@ public struct SwiftTermView: NSViewRepresentable {
         let font = TerminalFontManager.shared.getBestTerminalFont()
         terminalView.font = font
 
-        let secret = KeychainManager.shared.readCredential(for: host.keychainAccountKey)
-        let env = SSHAskPassHelper.shared.buildEnvironment(secret: secret)
+        // Ambiente de acordo com o método de autenticação
+        // (SSH_ASKPASS + Keychain para senha/chave; SSH_AUTH_SOCK para agente)
+        let env = TerminalViewModel.buildConnectionEnvironment(for: host)
 
-        // startProcess é adiado 1 ciclo para container ter frame válido
+        // startProcess é adiado 1 ciclo para container ter frame válido.
+        // O estado inicia em .connecting; o watchdog marca .connected se o
+        // processo continuar vivo após o timeout, ou .failed se ele morrer antes.
         DispatchQueue.main.async {
             terminalView.startProcess(
                 executable: executable,
@@ -180,7 +183,8 @@ public struct SwiftTermView: NSViewRepresentable {
                 environment: env,
                 execName: nil
             )
-            onStateChanged(.connected)
+            onStateChanged(.connecting)
+            context.coordinator.scheduleConnectionWatchdog()
         }
 
         return container
@@ -194,9 +198,24 @@ public struct SwiftTermView: NSViewRepresentable {
 
     public class Coordinator: NSObject, LocalProcessTerminalViewDelegate {
         var parent: SwiftTermView
+        private var wasTerminated = false
+        private var connectionEstablished = false
+        
+        /// Timeout (em segundos) antes de considerar a conexão estabelecida
+        private let connectionWatchdogTimeout: TimeInterval = 15
 
         init(_ parent: SwiftTermView) {
             self.parent = parent
+        }
+        
+        /// Se o processo continuar vivo após o timeout, marca .connected;
+        /// se morrer antes, `processTerminated` já terá marcado .failed.
+        func scheduleConnectionWatchdog() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + connectionWatchdogTimeout) { [weak self] in
+                guard let self, !self.wasTerminated, !self.connectionEstablished else { return }
+                self.connectionEstablished = true
+                self.parent.onStateChanged(.connected)
+            }
         }
 
         public func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
@@ -205,8 +224,15 @@ public struct SwiftTermView: NSViewRepresentable {
 
         public func processTerminated(source: TerminalView, exitCode: Int32?) {
             DispatchQueue.main.async {
-                if let code = exitCode, code != 0 {
-                    self.parent.onStateChanged(.failed("Processo finalizado com código \(code)"))
+                self.wasTerminated = true
+                
+                if !self.connectionEstablished, let code = exitCode, code != 0 {
+                    let reason = code == 255
+                        ? "Não foi possível conectar ao host. Verifique host, porta e credenciais."
+                        : "Processo finalizado com código \(code)"
+                    self.parent.onStateChanged(.failed(reason))
+                } else if let code = exitCode, code != 0 {
+                    self.parent.onStateChanged(.failed("Sessão encerrada com código \(code)"))
                 } else {
                     self.parent.onStateChanged(.disconnected)
                 }

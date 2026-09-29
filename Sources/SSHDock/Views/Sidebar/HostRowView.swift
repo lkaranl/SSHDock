@@ -32,7 +32,7 @@ public struct HostRowView: View {
     public var body: some View {
         HStack(spacing: 10) {
             // Ícone do Host (SF Symbol de acordo com Auth Method)
-            Image(systemName: host.authMethod == .password ? "lock.fill" : "key.fill")
+            Image(systemName: host.authMethod.iconName)
                 .foregroundColor(activeSession != nil ? .accentColor : .secondary)
                 .font(.system(size: 13))
             

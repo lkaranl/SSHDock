@@ -13,6 +13,19 @@ public struct MainView: View {
             TerminalContainerView(viewModel: viewModel)
         }
         .navigationTitle("SSHDock")
+        // Alerta global de erros (persistência, Keychain, etc.)
+        .alert(
+            "Ocorreu um erro",
+            isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.errorMessage = nil } }
+            ),
+            presenting: viewModel.errorMessage
+        ) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { message in
+            Text(message)
+        }
         // .prominentDetail: sidebar sobrepõe o detail sem redimensioná-lo.
         // Elimina 100% das chamadas setFrameSize/Metal durante toggle do sidebar.
         .navigationSplitViewStyle(.prominentDetail)
